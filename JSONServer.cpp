@@ -20,6 +20,7 @@ http://www.binarii.com/files/papers/c_sockets.txt
 #include <string.h>
 #include <termios.h>
 #include "readUSB.h"
+#include <queue>
 using namespace std;
 
 int start_server(int PORT_NUMBER, int arduino_fd)
@@ -105,6 +106,8 @@ int start_server(int PORT_NUMBER, int arduino_fd)
     int bytes_read = read(arduino_fd, buf, 100);
     int end = bytes_read;
     string message;
+
+    queue<double> tempqueue;
     
     while(true) {
         int j = start;
@@ -119,6 +122,12 @@ int start_server(int PORT_NUMBER, int arduino_fd)
         
         if(j < end) {
             cout << message << endl;
+            double num = 0;
+            if(sscanf(message.c_str(), "The temperature is %lf degree C\n", &num) > 0){
+                std::cout << num << std::endl;
+            }
+            tempqueue.push(num);
+            
             string reply = "{\n\"temp\": \""+ message +"\"\n}\n";
             cout << reply << endl;
             send(fd, reply.c_str(), reply.length(), 0);
