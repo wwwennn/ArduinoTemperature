@@ -159,6 +159,14 @@ int start_server(int PORT_NUMBER, int arduino_fd)
                     cout << "incoming temperature is " << num << endl;
                     temp_queue.push_back(num);
                 }
+
+                cout << "the size is " << temp_queue.size() << endl;
+                // only keep 3600 records (1 record per second, 3600 records per hour)
+                if(temp_queue.size() > 3600){
+                  cout << "the size is " << temp_queue.size() << endl;
+                  temp_queue.pop_front();
+                }
+
                 if(!temp_queue.empty()){
                   calculate_data(temp_queue);
                   cout << "Avg: " << avg << " low: " << low << " high: " << high << endl;
