@@ -23,48 +23,35 @@
 #include <deque>
 using namespace std;
 
-//typedef struct {
-//    double avg;
-//    double low;
-//    double high;
-//} data;
-class Data {
-public:
-    double avg;
-    double low;
-    double high;
-};
+double avg = 0;
+double low;
+double high;
 
-Data* calculate_data(deque<double> temp_queue) {
-    Data* cur_data = new Data;
-    deque<double>:: iterator it;
+void calculate_data(deque<double> temp_queue) {
+
     double sum = 0;
     int count = 0;
-    
-    it = temp_queue.begin();
+    deque<double>::iterator it = temp_queue.begin();
+    low = *it;
+    high = *it;
+
     while(it != temp_queue.end()) {
+        // cout << *it << endl;
         if(*it != 0) {
-            if(cur_data->low == 0) {
-                cur_data->low = *it;
-            }
-            if(cur_data->high == 0) {
-                cur_data->high = *it;
-            }
             sum += *it;
-            if(*it - cur_data->high > 0) {
-                cur_data->high = *it;
+            if(*it - high > 0) {
+                high = *it;
             }
-            if(*it - cur_data->low < 0) {
-                cur_data->low = *it;
+            if(*it - low < 0) {
+                low = *it;
             }
             count++;
         }
-        it++;
+        *it++;
     }
     
-    cur_data->avg = sum / count;
-    
-    return cur_data;
+    avg = sum / count;
+    // return cur_data;
 }
 
 int start_server(int PORT_NUMBER, int arduino_fd)
@@ -169,11 +156,15 @@ int start_server(int PORT_NUMBER, int arduino_fd)
                 //                cout << message << endl;
                 double num = 0;
                 if(sscanf(message.c_str(), "The temperature is %lf degree C\n", &num) > 0){
-                    cout << num << endl;
+                    cout << "incoming temperature is " << num << endl;
                     temp_queue.push_back(num);
                 }
-                Data* cur_data = calculate_data(temp_queue);
-                cout << "Avg: " << cur_data->avg << " low: " << cur_data->low << " high: " << cur_data->high << endl;
+                if(!temp_queue.empty()){
+                  calculate_data(temp_queue);
+                  cout << "Avg: " << avg << " low: " << low << " high: " << high << endl;
+                }
+                // Data* cur_data = calculate_data(temp_queue);
+                
                 string reply = "{\n\"temp\": \""+ message +"\"\n}\n";
                 //                cout << reply << endl;
                 send(fd, reply.c_str(), reply.length(), 0);
