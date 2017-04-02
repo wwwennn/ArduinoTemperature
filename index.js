@@ -19,8 +19,8 @@ function sendToServer() {
 			}else msg = "noname"; 
 		}
 		// sends message back to pebble 
-		  Pebble.sendAppMessage({ "0": msg });
+		Pebble.sendAppMessage({ "0": msg });
 	};
-	  req.open(method, url, async); 
-	  req.send(null);
+	req.open(method, url, async); 
+	req.send(null);
 }

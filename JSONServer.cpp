@@ -15,9 +15,14 @@ http://www.binarii.com/files/papers/c_sockets.txt
 #include <errno.h>
 #include <string>
 #include <iostream>
+#include <fcntl.h>
+#include <signal.h>
+#include <string.h>
+#include <termios.h>
+#include "readUSB.h"
 using namespace std;
 
-int start_server(int PORT_NUMBER)
+int start_server(int PORT_NUMBER, int arduino_fd)
 {
 
       // structs to represent the server and client
@@ -82,15 +87,51 @@ int start_server(int PORT_NUMBER)
            "name": "cit595"
         }
       */
-      string reply = "{\n\"name\": \"cit595\"\n}\n";
-      
-      // 6. send: send the message over the socket
-      // note that the second argument is a char*, and the third is the number of chars
-      send(fd, reply.c_str(), reply.length(), 0);
-      //printf("Server sent message: %s\n", reply);
-
-      // 7. close: close the socket connection
-      close(fd);
+//    while(true) {
+//        string message = get_message(arduino_fd);
+//      string reply = "{\n\"temp\": \""+ message +"\"\n}\n";
+//      
+//      // 6. send: send the message over the socket
+//      // note that the second argument is a char*, and the third is the number of chars
+//      send(fd, reply.c_str(), reply.length(), 0);
+//      //printf("Server sent message: %s\n", reply);
+//
+//      // 7. close: close the socket connection
+//      close(fd);
+//    }
+    configure(arduino_fd);
+    char buf[100];
+    int start = 0;
+    int bytes_read = read(arduino_fd, buf, 100);
+    int end = bytes_read;
+    string message;
+    
+    while(true) {
+        int j = start;
+        
+        while(j < end) {
+            if(buf[j] == '\n') {
+                break;
+            }
+            message += buf[j];
+            j++;
+        }
+        
+        if(j < end) {
+            cout << message << endl;
+            string reply = "{\n\"temp\": \""+ message +"\"\n}\n";
+            cout << reply << endl;
+            send(fd, reply.c_str(), reply.length(), 0);
+            close(fd);
+            message.clear();
+            start = ++j;
+        } else {
+            bytes_read = read(arduino_fd, buf, 100);
+            start = 0;
+            end = bytes_read;
+        }
+    }
+    
       close(sock);
       cout << "Server closed connection" << endl;
   
@@ -98,17 +139,32 @@ int start_server(int PORT_NUMBER)
 } 
 
 
-
 int main(int argc, char *argv[])
 {
   // check the number of arguments
-  if (argc != 2)
+    // argc2:port number ; argc: equip
+  if (argc != 3)
     {
-      cout << endl << "Usage: server [port_number]" << endl;
+      cout << endl << "Usage: server [port_number] or " << "Please specify the name of the serial port (USB) device file!" << endl;
       exit(0);
     }
 
   int PORT_NUMBER = atoi(argv[1]);
-  start_server(PORT_NUMBER);
+    
+    // get the name from the command line
+    char* file_name = argv[2];
+    
+    // try to open the file for reading and writing
+    int fd = open(argv[2], O_RDWR | O_NOCTTY | O_NDELAY);
+    
+    if (fd < 0) {
+        perror("Could not open file");
+        exit(1);
+    }
+    else {
+        cout << "Successfully opened " << argv[2] << " for reading/writing" << endl;
+    }
+    
+  start_server(PORT_NUMBER, fd);
 }
 
