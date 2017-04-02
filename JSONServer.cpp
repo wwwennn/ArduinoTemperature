@@ -20,17 +20,51 @@
 #include <string.h>
 #include <termios.h>
 #include "readUSB.h"
-#include <queue>
+#include <deque>
 using namespace std;
 
-typedef struct {
+//typedef struct {
+//    double avg;
+//    double low;
+//    double high;
+//} data;
+class Data {
+public:
     double avg;
     double low;
     double high;
-} data;
+};
 
-data calculate_data(queue temp_queue) {
+Data* calculate_data(deque<double> temp_queue) {
+    Data* cur_data = new Data;
+    deque<double>:: iterator it;
+    double sum = 0;
+    int count = 0;
     
+    it = temp_queue.begin();
+    while(it != temp_queue.end()) {
+        if(*it != 0) {
+            if(cur_data->low == 0) {
+                cur_data->low = *it;
+            }
+            if(cur_data->high == 0) {
+                cur_data->high = *it;
+            }
+            sum += *it;
+            if(*it - cur_data->high > 0) {
+                cur_data->high = *it;
+            }
+            if(*it - cur_data->low < 0) {
+                cur_data->low = *it;
+            }
+            count++;
+        }
+        it++;
+    }
+    
+    cur_data->avg = sum / count;
+    
+    return cur_data;
 }
 
 int start_server(int PORT_NUMBER, int arduino_fd)
@@ -117,7 +151,7 @@ int start_server(int PORT_NUMBER, int arduino_fd)
     int end = bytes_read;
     string message;
     
-    queue<double> temp_queue;
+    deque<double> temp_queue;
     
     while(true) {
         int j = start;
@@ -136,9 +170,10 @@ int start_server(int PORT_NUMBER, int arduino_fd)
                 double num = 0;
                 if(sscanf(message.c_str(), "The temperature is %lf degree C\n", &num) > 0){
                     cout << num << endl;
+                    temp_queue.push_back(num);
                 }
-                temp_queue.push(num);
-                data cur_data = calculate_data(temp_queue);
+                Data* cur_data = calculate_data(temp_queue);
+                cout << "Avg: " << cur_data->avg << " low: " << cur_data->low << " high: " << cur_data->high << endl;
                 string reply = "{\n\"temp\": \""+ message +"\"\n}\n";
                 //                cout << reply << endl;
                 send(fd, reply.c_str(), reply.length(), 0);
