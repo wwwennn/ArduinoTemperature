@@ -23,6 +23,16 @@
 #include <queue>
 using namespace std;
 
+typedef struct {
+    double avg;
+    double low;
+    double high;
+} data;
+
+data calculate_data(queue temp_queue) {
+    
+}
+
 int start_server(int PORT_NUMBER, int arduino_fd)
 {
     
@@ -128,7 +138,7 @@ int start_server(int PORT_NUMBER, int arduino_fd)
                     cout << num << endl;
                 }
                 temp_queue.push(num);
-                
+                data cur_data = calculate_data(temp_queue);
                 string reply = "{\n\"temp\": \""+ message +"\"\n}\n";
                 //                cout << reply << endl;
                 send(fd, reply.c_str(), reply.length(), 0);
@@ -148,6 +158,7 @@ int start_server(int PORT_NUMBER, int arduino_fd)
     
     return 0;
 }
+
 
 
 int main(int argc, char *argv[])
