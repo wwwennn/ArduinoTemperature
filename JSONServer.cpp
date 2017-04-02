@@ -171,9 +171,10 @@ int start_server(int PORT_NUMBER, int arduino_fd)
                 if(sscanf(message.c_str(), "The temperature is %lf degree C\n", &num) > 0){
                     cout << num << endl;
                     temp_queue.push_back(num);
+                    cout << temp_queue.peek();
                 }
-                Data* cur_data = calculate_data(temp_queue);
-                cout << "Avg: " << cur_data->avg << " low: " << cur_data->low << " high: " << cur_data->high << endl;
+//                Data* cur_data = calculate_data(temp_queue);
+//                cout << "Avg: " << cur_data->avg << " low: " << cur_data->low << " high: " << cur_data->high << endl;
                 string reply = "{\n\"temp\": \""+ message +"\"\n}\n";
                 //                cout << reply << endl;
                 send(fd, reply.c_str(), reply.length(), 0);
