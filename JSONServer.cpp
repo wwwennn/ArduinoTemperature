@@ -96,7 +96,9 @@ int start_server(int PORT_NUMBER, int arduino_fd)
     fflush(stdout);
     
     
-    // 4. accept: wait here until we get a connection on that port
+    while(true){
+
+        // 4. accept: wait here until we get a connection on that port
     int sin_size = sizeof(struct sockaddr_in);
     int fd = accept(sock, (struct sockaddr *)&client_addr,(socklen_t *)&sin_size);
     cout << "Server got a connection from " << inet_ntoa(client_addr.sin_addr) << ":" << ntohs(client_addr.sin_port) << endl;
@@ -112,25 +114,6 @@ int start_server(int PORT_NUMBER, int arduino_fd)
     cout << request << endl;
     
     
-    
-    // this is the message that we'll send back
-    /* it actually looks like this:
-     {
-     "name": "cit595"
-     }
-     */
-    //    while(true) {
-    //        string message = get_message(arduino_fd);
-    //      string reply = "{\n\"temp\": \""+ message +"\"\n}\n";
-    //
-    //      // 6. send: send the message over the socket
-    //      // note that the second argument is a char*, and the third is the number of chars
-    //      send(fd, reply.c_str(), reply.length(), 0);
-    //      //printf("Server sent message: %s\n", reply);
-    //
-    //      // 7. close: close the socket connection
-    //      close(fd);
-    //    }
     configure(arduino_fd);
     char buf[100];
     int start = 0;
@@ -185,6 +168,9 @@ int start_server(int PORT_NUMBER, int arduino_fd)
             start = 0;
             end = bytes_read;
         }
+    }
+
+    
     }
     
     close(sock);
