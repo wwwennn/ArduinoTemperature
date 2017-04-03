@@ -21,20 +21,22 @@
 #include <termios.h>
 #include "readUSB.h"
 #include <deque>
+#include <pthread.h>
 using namespace std;
 
-double avg = 0;
+double avg;
 double low;
 double high;
+double num;
 
 void calculate_data(deque<double> temp_queue) {
-
+    
     double sum = 0;
     int count = 0;
     deque<double>::iterator it = temp_queue.begin();
     low = *it;
     high = *it;
-
+    
     while(it != temp_queue.end()) {
         // cout << *it << endl;
         if(*it != 0) {
@@ -54,7 +56,63 @@ void calculate_data(deque<double> temp_queue) {
     // return cur_data;
 }
 
-int start_server(int PORT_NUMBER, int arduino_fd)
+void* read_arduino(void* p) {
+    int* arduino_fd = (int*)p;
+    configure(*arduino_fd);
+    char buf[100];
+    int start = 0;
+    int bytes_read = read(*arduino_fd, buf, 100);
+    int end = bytes_read;
+    string message;
+    
+    deque<double> temp_queue;
+    
+    while(true) {
+        int j = start;
+        
+        while(j < end) {
+            if(buf[j] == '\n') {
+                break;
+            }
+            message += buf[j];
+            j++;
+        }
+        
+        if(j < end) {
+            if(message.length() != 0) {
+                //                cout << message << endl;
+                //                double num = 0;
+                if(sscanf(message.c_str(), "The temperature is %lf degree C\n", &num) > 0){
+                    cout << "incoming temperature is " << num << endl;
+                    temp_queue.push_back(num);
+                }
+                
+                cout << "the size is " << temp_queue.size() << endl;
+                // only keep 3600 records (1 record per second, 3600 records per hour)
+                if(temp_queue.size() > 3600){
+                    cout << "the size is " << temp_queue.size() << endl;
+                    temp_queue.pop_front();
+                }
+                
+                if(!temp_queue.empty()){
+                    calculate_data(temp_queue);
+                    cout << "Avg: " << avg << " low: " << low << " high: " << high << endl;
+                }
+                // Data* cur_data = calculate_data(temp_queue);
+                
+                
+            }
+            message.clear();
+            start = ++j;
+        } else {
+            bytes_read = read(*arduino_fd, buf, 100);
+            start = 0;
+            end = bytes_read;
+        }
+    }
+}
+
+int start_server(int PORT_NUMBER)
 {
     
     // structs to represent the server and client
@@ -97,80 +155,26 @@ int start_server(int PORT_NUMBER, int arduino_fd)
     
     
     while(true){
-
+        
         // 4. accept: wait here until we get a connection on that port
-    int sin_size = sizeof(struct sockaddr_in);
-    int fd = accept(sock, (struct sockaddr *)&client_addr,(socklen_t *)&sin_size);
-    cout << "Server got a connection from " << inet_ntoa(client_addr.sin_addr) << ":" << ntohs(client_addr.sin_port) << endl;
-    
-    // buffer to read data into
-    char request[1024];
-    
-    // 5. recv: read incoming message into buffer
-    int bytes_received = recv(fd,request,1024,0);
-    // null-terminate the string
-    request[bytes_received] = '\0';
-    cout << "Here comes the message:" << endl;
-    cout << request << endl;
-    
-    
-    configure(arduino_fd);
-    char buf[100];
-    int start = 0;
-    int bytes_read = read(arduino_fd, buf, 100);
-    int end = bytes_read;
-    string message;
-    
-    deque<double> temp_queue;
-    
-    while(true) {
-        int j = start;
+        int sin_size = sizeof(struct sockaddr_in);
+        int fd = accept(sock, (struct sockaddr *)&client_addr,(socklen_t *)&sin_size);
+        cout << "Server got a connection from " << inet_ntoa(client_addr.sin_addr) << ":" << ntohs(client_addr.sin_port) << endl;
         
-        while(j < end) {
-            if(buf[j] == '\n') {
-                break;
-            }
-            message += buf[j];
-            j++;
-        }
+        // buffer to read data into
+        char request[1024];
         
-        if(j < end) {
-            if(message.length() != 0) {
-                //                cout << message << endl;
-                double num = 0;
-                if(sscanf(message.c_str(), "The temperature is %lf degree C\n", &num) > 0){
-                    cout << "incoming temperature is " << num << endl;
-                    temp_queue.push_back(num);
-                }
-
-                cout << "the size is " << temp_queue.size() << endl;
-                // only keep 3600 records (1 record per second, 3600 records per hour)
-                if(temp_queue.size() > 3600){
-                  cout << "the size is " << temp_queue.size() << endl;
-                  temp_queue.pop_front();
-                }
-
-                if(!temp_queue.empty()){
-                  calculate_data(temp_queue);
-                  cout << "Avg: " << avg << " low: " << low << " high: " << high << endl;
-                }
-                // Data* cur_data = calculate_data(temp_queue);
-                
-                string reply = "{\n\"temp\": \""+ message +"\"\n}\n";
-                //                cout << reply << endl;
-                send(fd, reply.c_str(), reply.length(), 0);
-                close(fd);
-            }
-            message.clear();
-            start = ++j;
-        } else {
-            bytes_read = read(arduino_fd, buf, 100);
-            start = 0;
-            end = bytes_read;
-        }
-    }
-
-    
+        // 5. recv: read incoming message into buffer
+        int bytes_received = recv(fd,request,1024,0);
+        // null-terminate the string
+        request[bytes_received] = '\0';
+        cout << "Here comes the message:" << endl;
+        cout << request << endl;
+        
+        string reply = "{\n\"temp\": \""+ to_string(num) +"\"\n}\n";
+        //                cout << reply << endl;
+        send(fd, reply.c_str(), reply.length(), 0);
+        close(fd);
     }
     
     close(sock);
@@ -197,9 +201,9 @@ int main(int argc, char *argv[])
     char* file_name = argv[2];
     
     // try to open the file for reading and writing
-    int fd = open(argv[2], O_RDWR | O_NOCTTY | O_NDELAY);
+    int arduino_fd = open(argv[2], O_RDWR | O_NOCTTY | O_NDELAY);
     
-    if (fd < 0) {
+    if (arduino_fd < 0) {
         perror("Could not open file");
         exit(1);
     }
@@ -207,6 +211,11 @@ int main(int argc, char *argv[])
         cout << "Successfully opened " << argv[2] << " for reading/writing" << endl;
     }
     
-    start_server(PORT_NUMBER, fd);
+    int r = 0;
+    pthread_t arduino_thread;
+    r = pthread_create(&arduino_thread, NULL, read_arduino, &arduino_fd);
+    start_server(PORT_NUMBER);
+    void* r1;
+    pthread_join(arduino_thread, &r1);
 }
 
