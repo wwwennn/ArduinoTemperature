@@ -201,7 +201,7 @@ int main(int argc, char *argv[])
     // argc2:port number ; argc: equip
     if (argc != 3)
     {
-        cout << endl << "Usage: server [port_number] or " << "Please specify the name of the serial port (USB) device file!" << endl;
+        cout << endl << "Usage: ./server [port_number] [name of the serial port (USB) device file]" << endl;
         exit(0);
     }
     
