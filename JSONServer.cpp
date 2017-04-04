@@ -38,7 +38,6 @@ void calculate_data(deque<double> temp_queue) {
     high = *it;
     
     while(it != temp_queue.end()) {
-        // cout << *it << endl;
         if(*it != 0) {
             sum += *it;
             if(*it - high > 0) {
@@ -53,7 +52,6 @@ void calculate_data(deque<double> temp_queue) {
     }
     
     avg = sum / count;
-    // return cur_data;
 }
 
 void* read_arduino(void* p) {
@@ -80,17 +78,12 @@ void* read_arduino(void* p) {
         
         if(j < end) {
             if(message.length() != 0) {
-                //                cout << message << endl;
-                //                double num = 0;
                 if(sscanf(message.c_str(), "The temperature is %lf degree C\n", &num) > 0){
-                    cout << "incoming temperature is " << num << endl;
                     temp_queue.push_back(num);
                 }
                 
-                cout << "the size is " << temp_queue.size() << endl;
                 // only keep 3600 records (1 record per second, 3600 records per hour)
                 if(temp_queue.size() > 3600){
-                    cout << "the size is " << temp_queue.size() << endl;
                     temp_queue.pop_front();
                 }
                 
@@ -171,8 +164,8 @@ int start_server(int PORT_NUMBER)
         cout << "Here comes the message:" << endl;
         cout << request << endl;
         
-        string reply = "{\n\"temp\": \""+ to_string(num) +"\"\n}\n";
-        //                cout << reply << endl;
+        string reply = "{\n\"temp\": \""+ to_string(num) +"\",\n\"avg\": \"" + to_string(avg) + "\",\n\"low\": \"" + to_string(low) + "\",\n\"high\": \"" + to_string(high) + "\"\n}\n";
+        cout << reply << endl;
         send(fd, reply.c_str(), reply.length(), 0);
         close(fd);
     }
