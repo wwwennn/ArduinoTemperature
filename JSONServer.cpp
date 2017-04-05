@@ -28,6 +28,22 @@ double avg;
 double low;
 double high;
 double num;
+// if true the current temp is shown in C, if false, current temp is shown in F
+bool tempIndicator = true;
+
+double temp_convertor(double temp){
+    double new_temp;
+    if(tempIndicator){
+        // convert C to F
+        new_temp = 1.8*temp + 32;
+        tempIndicator = false;
+    }else{
+        // convert F to C
+        new_temp = (temp - 32)/1.8;
+        tempIndicator = true;
+    }
+    return new_temp;
+}
 
 void calculate_data(deque<double> temp_queue) {
     
@@ -163,8 +179,10 @@ int start_server(int PORT_NUMBER)
         request[bytes_received] = '\0';
         cout << "Here comes the message:" << endl;
         cout << request << endl;
+
+        string reply = "{\n\"temp\": \""+ to_string(temp_convertor(num)) +"\",\n\"avg\": \"" + to_string(temp_convertor(avg)) + "\",\n\"low\": \"" + to_string(temp_convertor(low)) + "\",\n\"high\": \"" + to_string(temp_convertor(high)) + "\"\n}\n";
         
-        string reply = "{\n\"temp\": \""+ to_string(num) +"\",\n\"avg\": \"" + to_string(avg) + "\",\n\"low\": \"" + to_string(low) + "\",\n\"high\": \"" + to_string(high) + "\"\n}\n";
+        // string reply = "{\n\"temp\": \""+ to_string(num) +"\",\n\"avg\": \"" + to_string(avg) + "\",\n\"low\": \"" + to_string(low) + "\",\n\"high\": \"" + to_string(high) + "\"\n}\n";
         cout << reply << endl;
         send(fd, reply.c_str(), reply.length(), 0);
         close(fd);
