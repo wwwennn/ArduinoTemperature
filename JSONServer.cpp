@@ -32,20 +32,6 @@ deque<double> temp_queue;
 // if true the current temp is shown in C, if false, current temp is shown in F
 bool tempIndicator = true;
 
-double temp_convertor(double temp){
-    double new_temp;
-    if(tempIndicator){
-        // convert C to F
-        new_temp = 1.8*temp + 32;
-        tempIndicator = false;
-    }else{
-        // convert F to C
-        new_temp = (temp - 32)/1.8;
-        tempIndicator = true;
-    }
-    return new_temp;
-}
-
 void calculate_data(deque<double> temp_queue) {
     
     double sum = 0;
@@ -186,21 +172,28 @@ int start_server(int PORT_NUMBER)
         cout << "url:" << url << endl;
 
         calculate_data(temp_queue);
-
+        cout << "Avg: " << avg << " low: " << low << " high: " << high << endl;
+        string reply;
         if(strcmp(url, "/") == 0){
-            string reply = "{\n\"temp\": \""+ to_string(num) +"\",\n\"avg\": \"" + to_string(avg) + "\",\n\"low\": \"" + to_string(low) + "\",\n\"high\": \"" + to_string(high) + "\"\n}\n";
+            if(tempIndicator){
+                reply = "{\n\"temp\": \""+ to_string(num) +"\",\n\"avg\": \"" + to_string(avg) + "\",\n\"low\": \"" + to_string(low) + "\",\n\"high\": \"" + to_string(high) + "\"\n}\n";       
+            }else{
+                reply = "{\n\"temp\": \""+ to_string(1.8*(num)+32) +"\",\n\"avg\": \"" + to_string(1.8*(avg)+32) + "\",\n\"low\": \"" + to_string(1.8*(low)+32) + "\",\n\"high\": \"" + to_string(1.8*(high)+32) + "\"\n}\n";        
+            }
         }else if(strcmp(url, "/convert") == 0){
-            string reply = "{\n\"temp\": \""+ to_string(temp_convertor(num)) +"\",\n\"avg\": \"" + to_string(temp_convertor(avg)) + "\",\n\"low\": \"" + to_string(temp_convertor(low)) + "\",\n\"high\": \"" + to_string(temp_convertor(high)) + "\"\n}\n";
+            if(tempIndicator){
+                reply = "{\n\"temp\": \""+ to_string(1.8*(num)+32) +"\",\n\"avg\": \"" + to_string(1.8*(avg)+32) + "\",\n\"low\": \"" + to_string(1.8*(low)+32) + "\",\n\"high\": \"" + to_string(1.8*(high)+32) + "\"\n}\n";
+                tempIndicator = false;
+            }else{
+                reply = "{\n\"temp\": \""+ to_string(num) +"\",\n\"avg\": \"" + to_string(avg) + "\",\n\"low\": \"" + to_string(low) + "\",\n\"high\": \"" + to_string(high) + "\"\n}\n";
+                tempIndicator = true;
+            }
         }else if(strcmp(url, "/standby") == 0){
-            string reply = "{\n\"temp\": \""+ to_string(num) +"\",\n\"avg\": \"" + to_string(avg) + "\",\n\"low\": \"" + to_string(low) + "\",\n\"high\": \"" + to_string(high) + "\"\n}\n";
+            reply = "{\n\"temp\": \""+ to_string(num) +"\",\n\"avg\": \"" + to_string(avg) + "\",\n\"low\": \"" + to_string(low) + "\",\n\"high\": \"" + to_string(high) + "\"\n}\n";
         }else{
-            string reply = "{\n\"temp\": \""+ to_string(num) +"\",\n\"avg\": \"" + to_string(avg) + "\",\n\"low\": \"" + to_string(low) + "\",\n\"high\": \"" + to_string(high) + "\"\n}\n";  
+            reply = "{\n\"temp\": \""+ to_string(num) +"\",\n\"avg\": \"" + to_string(avg) + "\",\n\"low\": \"" + to_string(low) + "\",\n\"high\": \"" + to_string(high) + "\"\n}\n";  
         }
-        
 
-        string reply = "{\n\"temp\": \""+ to_string(temp_convertor(num)) +"\",\n\"avg\": \"" + to_string(temp_convertor(avg)) + "\",\n\"low\": \"" + to_string(temp_convertor(low)) + "\",\n\"high\": \"" + to_string(temp_convertor(high)) + "\"\n}\n";
-        
-        // string reply = "{\n\"temp\": \""+ to_string(num) +"\",\n\"avg\": \"" + to_string(avg) + "\",\n\"low\": \"" + to_string(low) + "\",\n\"high\": \"" + to_string(high) + "\"\n}\n";
         cout << reply << endl;
         send(fd, reply.c_str(), reply.length(), 0);
         close(fd);
