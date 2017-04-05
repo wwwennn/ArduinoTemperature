@@ -28,6 +28,7 @@ double avg;
 double low;
 double high;
 double num;
+deque<double> temp_queue;
 // if true the current temp is shown in C, if false, current temp is shown in F
 bool tempIndicator = true;
 
@@ -79,7 +80,7 @@ void* read_arduino(void* p) {
     int end = bytes_read;
     string message;
     
-    deque<double> temp_queue;
+    
     
     while(true) {
         int j = start;
@@ -103,10 +104,10 @@ void* read_arduino(void* p) {
                     temp_queue.pop_front();
                 }
                 
-                if(!temp_queue.empty()){
-                    calculate_data(temp_queue);
-                    cout << "Avg: " << avg << " low: " << low << " high: " << high << endl;
-                }
+                // if(!temp_queue.empty()){
+                //     calculate_data(temp_queue);
+                //     cout << "Avg: " << avg << " low: " << low << " high: " << high << endl;
+                // }
                 // Data* cur_data = calculate_data(temp_queue);
                 
                 
@@ -179,6 +180,23 @@ int start_server(int PORT_NUMBER)
         request[bytes_received] = '\0';
         cout << "Here comes the message:" << endl;
         cout << request << endl;
+        char method[20];
+        char url[20];
+        sscanf(request, "%s %s", method, url);
+        cout << "url:" << url << endl;
+
+        calculate_data(temp_queue);
+
+        if(strcmp(url, "/") == 0){
+            string reply = "{\n\"temp\": \""+ to_string(num) +"\",\n\"avg\": \"" + to_string(avg) + "\",\n\"low\": \"" + to_string(low) + "\",\n\"high\": \"" + to_string(high) + "\"\n}\n";
+        }else if(strcmp(url, "/convert") == 0){
+            string reply = "{\n\"temp\": \""+ to_string(temp_convertor(num)) +"\",\n\"avg\": \"" + to_string(temp_convertor(avg)) + "\",\n\"low\": \"" + to_string(temp_convertor(low)) + "\",\n\"high\": \"" + to_string(temp_convertor(high)) + "\"\n}\n";
+        }else if(strcmp(url, "/standby") == 0){
+            string reply = "{\n\"temp\": \""+ to_string(num) +"\",\n\"avg\": \"" + to_string(avg) + "\",\n\"low\": \"" + to_string(low) + "\",\n\"high\": \"" + to_string(high) + "\"\n}\n";
+        }else{
+            string reply = "{\n\"temp\": \""+ to_string(num) +"\",\n\"avg\": \"" + to_string(avg) + "\",\n\"low\": \"" + to_string(low) + "\",\n\"high\": \"" + to_string(high) + "\"\n}\n";  
+        }
+        
 
         string reply = "{\n\"temp\": \""+ to_string(temp_convertor(num)) +"\",\n\"avg\": \"" + to_string(temp_convertor(avg)) + "\",\n\"low\": \"" + to_string(temp_convertor(low)) + "\",\n\"high\": \"" + to_string(temp_convertor(high)) + "\"\n}\n";
         
