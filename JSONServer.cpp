@@ -108,7 +108,7 @@ void* read_arduino(void* p) {
     }
 }
 
-int start_server(int PORT_NUMBER)
+int start_server(int PORT_NUMBER, int arduino_fd)
 {
     
     // structs to represent the server and client
@@ -184,9 +184,22 @@ int start_server(int PORT_NUMBER)
             if(tempIndicator){
                 reply = "{\n\"temp\": \""+ to_string(1.8*(num)+32) +"\",\n\"avg\": \"" + to_string(1.8*(avg)+32) + "\",\n\"low\": \"" + to_string(1.8*(low)+32) + "\",\n\"high\": \"" + to_string(1.8*(high)+32) + "\"\n}\n";
                 tempIndicator = false;
+                
+                char f = 'f';
+                char *char_ptr = &f;
+                int bytes_written = write(arduino_fd, char_ptr, 1);
+                cout <<bytes_written<<endl;
+                perror("error");
+            
             }else{
                 reply = "{\n\"temp\": \""+ to_string(num) +"\",\n\"avg\": \"" + to_string(avg) + "\",\n\"low\": \"" + to_string(low) + "\",\n\"high\": \"" + to_string(high) + "\"\n}\n";
                 tempIndicator = true;
+                
+                char f = 'c';
+                char *char_ptr = &f;
+                int bytes_written = write(arduino_fd, char_ptr, 1);
+                
+            
             }
         }else if(strcmp(url, "/standby") == 0){
             reply = "{\n\"temp\": \""+ to_string(num) +"\",\n\"avg\": \"" + to_string(avg) + "\",\n\"low\": \"" + to_string(low) + "\",\n\"high\": \"" + to_string(high) + "\"\n}\n";
@@ -224,7 +237,9 @@ int main(int argc, char *argv[])
     
     // try to open the file for reading and writing
     int arduino_fd = open(argv[2], O_RDWR | O_NOCTTY | O_NDELAY);
+    //int arduino_fd = open(argv[2], O_RDWR);
     
+
     if (arduino_fd < 0) {
         perror("Could not open file");
         exit(1);
@@ -232,11 +247,17 @@ int main(int argc, char *argv[])
     else {
         cout << "Successfully opened " << argv[2] << " for reading/writing" << endl;
     }
+
+    // struct  termios options;
+    // tcgetattr(arduino_fd, &options);
+    // cfsetispeed(&options, 9600);
+    // cfsetospeed(&options, 9600);
+    // tcsetattr(arduino_fd, TCSANOW, &options);
     
     int r = 0;
     pthread_t arduino_thread;
     r = pthread_create(&arduino_thread, NULL, read_arduino, &arduino_fd);
-    start_server(PORT_NUMBER);
+    start_server(PORT_NUMBER, arduino_fd);
     void* r1;
     pthread_join(arduino_thread, &r1);
 }
