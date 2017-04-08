@@ -126,6 +126,11 @@ int start_server(int PORT_NUMBER, int arduino_fd)
         perror("Setsockopt");
         exit(1);
     }
+    //    if(setsockopt(sock, SOL_SOCKET, SO_SNDTIMEO, &temp, sizeof(int)) == -1)
+    //    {
+    //        perror("Setsockopt");
+    //        exit(1);
+    //    }
     
     // configure the server
     server_addr.sin_port = htons(PORT_NUMBER); // specify port number
@@ -170,15 +175,15 @@ int start_server(int PORT_NUMBER, int arduino_fd)
         char url[20];
         sscanf(request, "%s %s", method, url);
         cout << "url:" << url << endl;
-
+        
         calculate_data(temp_queue);
         cout << "Avg: " << avg << " low: " << low << " high: " << high << endl;
         string reply;
         if(strcmp(url, "/") == 0){
             if(tempIndicator){
-                reply = "{\n\"temp\": \""+ to_string(num) +"\",\n\"avg\": \"" + to_string(avg) + "\",\n\"low\": \"" + to_string(low) + "\",\n\"high\": \"" + to_string(high) + "\"\n}\n";       
+                reply = "{\n\"temp\": \""+ to_string(num) +"\",\n\"avg\": \"" + to_string(avg) + "\",\n\"low\": \"" + to_string(low) + "\",\n\"high\": \"" + to_string(high) + "\"\n}\n";
             }else{
-                reply = "{\n\"temp\": \""+ to_string(1.8*(num)+32) +"\",\n\"avg\": \"" + to_string(1.8*(avg)+32) + "\",\n\"low\": \"" + to_string(1.8*(low)+32) + "\",\n\"high\": \"" + to_string(1.8*(high)+32) + "\"\n}\n";        
+                reply = "{\n\"temp\": \""+ to_string(1.8*(num)+32) +"\",\n\"avg\": \"" + to_string(1.8*(avg)+32) + "\",\n\"low\": \"" + to_string(1.8*(low)+32) + "\",\n\"high\": \"" + to_string(1.8*(high)+32) + "\"\n}\n";
             }
         }else if(strcmp(url, "/convert") == 0){
             if(tempIndicator){
@@ -187,26 +192,28 @@ int start_server(int PORT_NUMBER, int arduino_fd)
                 
                 char f = 'f';
                 char *char_ptr = &f;
+                //                cout<< "enter" << endl;
                 int bytes_written = write(arduino_fd, char_ptr, 1);
                 cout <<bytes_written<<endl;
                 perror("error");
-            
+                
             }else{
                 reply = "{\n\"temp\": \""+ to_string(num) +"\",\n\"avg\": \"" + to_string(avg) + "\",\n\"low\": \"" + to_string(low) + "\",\n\"high\": \"" + to_string(high) + "\"\n}\n";
                 tempIndicator = true;
                 
                 char f = 'c';
                 char *char_ptr = &f;
+                //                cout<< "enter" << endl;
                 int bytes_written = write(arduino_fd, char_ptr, 1);
-                
-            
+                cout <<bytes_written<<endl;
+                perror("error");
             }
         }else if(strcmp(url, "/standby") == 0){
             reply = "{\n\"temp\": \""+ to_string(num) +"\",\n\"avg\": \"" + to_string(avg) + "\",\n\"low\": \"" + to_string(low) + "\",\n\"high\": \"" + to_string(high) + "\"\n}\n";
         }else{
-            reply = "{\n\"temp\": \""+ to_string(num) +"\",\n\"avg\": \"" + to_string(avg) + "\",\n\"low\": \"" + to_string(low) + "\",\n\"high\": \"" + to_string(high) + "\"\n}\n";  
+            reply = "{\n\"temp\": \""+ to_string(num) +"\",\n\"avg\": \"" + to_string(avg) + "\",\n\"low\": \"" + to_string(low) + "\",\n\"high\": \"" + to_string(high) + "\"\n}\n";
         }
-
+        
         cout << reply << endl;
         send(fd, reply.c_str(), reply.length(), 0);
         close(fd);
@@ -237,9 +244,12 @@ int main(int argc, char *argv[])
     
     // try to open the file for reading and writing
     int arduino_fd = open(argv[2], O_RDWR | O_NOCTTY | O_NDELAY);
-    //int arduino_fd = open(argv[2], O_RDWR);
+    //    int arduino_fd = open(argv[2], O_RDWR | O_NDELAY);
+    fcntl(arduino_fd, F_SETFL, FNDELAY);
+    //    fcntl(arduino_fd, F_SETFL, 0);
+    //    for(int count = 0; count < 65556; count ++);
     
-
+    
     if (arduino_fd < 0) {
         perror("Could not open file");
         exit(1);
@@ -247,7 +257,7 @@ int main(int argc, char *argv[])
     else {
         cout << "Successfully opened " << argv[2] << " for reading/writing" << endl;
     }
-
+    
     // struct  termios options;
     // tcgetattr(arduino_fd, &options);
     // cfsetispeed(&options, 9600);

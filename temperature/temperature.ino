@@ -229,7 +229,8 @@ void Dis_7SEG (int Decimal, byte High, byte Low, bool sign, char temp)
 
   if (Digit > 0)                 /* Display "c" if there is more space on 7-SEG */
   {
-    Send7SEG (Digit,0x58);
+    // Send7SEG (Digit,0x58);
+    Send7SEG (Digit,0x71);
     Digit--;
   }
   
