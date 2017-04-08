@@ -82,6 +82,10 @@ void* read_arduino(void* p) {
         if(j < end) {
             if(message.length() != 0) {
                 if(sscanf(message.c_str(), "The temperature is %lf degree C\n", &num) > 0){
+                    // to accomodate if the incoming temp is in F
+                    if(!tempIndicator){
+                        num = (num - 32)/1.8;
+                    }
                     temp_queue.push_back(num);
                 }
                 
