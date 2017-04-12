@@ -23,6 +23,9 @@ double avg = 0;
 double low = 0;
 double high = 0;
 bool temp_indicator = false;  // false: c; true: f
+// if true arduino is working, if false, arduino is not working
+bool arduino_status = true; // false: arduino is not working true: arduino is working
+//bool arduino_status = false; // temporarily set to false for testing purpose
 
 int start_server(int, int);
 void* read_arduino(void*);
@@ -127,53 +130,101 @@ int start_server(int PORT_NUMBER, int arduino_fd) {
         cout << "url:" << url << endl;
         
         string reply;
-        if(strcmp(url, "/") == 0) {
-            calculate_data(temp_queue);
-            reply = "{\n\"temp\": \""+ to_string(num) +"\",\n\"avg\": \"" + to_string(avg) + "\",\n\"low\": \"" + to_string(low) + "\",\n\"high\": \"" + to_string(high) + "\"\n}\n";
-            
-        } else if(strcmp(url, "/convert") == 0) {
-            calculate_data(temp_queue);
-            if(!temp_indicator) {
-                reply = "{\n\"temp\": \""+ to_string(num) +"\",\n\"avg\": \"" + to_string(avg) + "\",\n\"low\": \"" + to_string(low) + "\",\n\"high\": \"" + to_string(high) + "\"\n}\n";
-                char f = 'c';
-                char *char_ptr = &f;
+
+            if(strcmp(url, "/") == 0) {
+                // 0412 
+                if(!arduino_status){
+                    reply = "{\n\"temp\": \"no response\"\n}\n";
+                    cout << reply << endl;
+                    send(fd, reply.c_str(), reply.length(), 0);
+                    close(fd);
+                    continue;
+                }
+                calculate_data(temp_queue);
+                // 0412 
+                cout << "Avg: " << avg << " low: " << low << " high: " << high << endl;
+                if(temp_indicator) {
+                    reply = "{\n\"temp\": \""+ to_string(num) +"\",\n\"avg\": \"" + to_string(avg) + "\",\n\"low\": \"" + to_string(low) + "\",\n\"high\": \"" + to_string(high) + "\"\n}\n";
+                    char f = 'c';
+                    char *char_ptr = &f;
+                    int bytes_written = write(arduino_fd, char_ptr, 1);
+                    cout <<bytes_written<<endl;
+                    perror("error");
+                } else {
+                    reply = "{\n\"temp\": \""+ to_string(1.8 * num + 32) +"\",\n\"avg\": \"" + to_string(1.8 * avg + 32) + "\",\n\"low\": \"" + to_string(1.8 * low + 32) + "\",\n\"high\": \"" + to_string(1.8 * high + 32) + "\"\n}\n";
+                    char f = 'f';
+                    char *char_ptr = &f;
+                    int bytes_written = write(arduino_fd, char_ptr, 1);
+                    cout <<bytes_written<<endl;
+                    perror("error");
+                }
+
+            } else if(strcmp(url, "/convert") == 0) {
+                // 0412 
+                if(!arduino_status){
+                    reply = "{\n\"temp\": \"no response\"\n}\n";
+                    cout << reply << endl;
+                    send(fd, reply.c_str(), reply.length(), 0);
+                    close(fd);
+                    continue;
+                }
+                calculate_data(temp_queue);
+                cout << "Avg: " << avg << " low: " << low << " high: " << high << endl;
+                if(!temp_indicator) {
+                    reply = "{\n\"temp\": \""+ to_string(num) +"\",\n\"avg\": \"" + to_string(avg) + "\",\n\"low\": \"" + to_string(low) + "\",\n\"high\": \"" + to_string(high) + "\"\n}\n";
+                    char f = 'c';
+                    char *char_ptr = &f;
+                    int bytes_written = write(arduino_fd, char_ptr, 1);
+                    cout <<bytes_written<<endl;
+                    perror("error");
+                } else {
+                    reply = "{\n\"temp\": \""+ to_string(1.8 * num + 32) +"\",\n\"avg\": \"" + to_string(1.8 * avg + 32) + "\",\n\"low\": \"" + to_string(1.8 * low + 32) + "\",\n\"high\": \"" + to_string(1.8 * high + 32) + "\"\n}\n";
+                    char f = 'f';
+                    char *char_ptr = &f;
+                    int bytes_written = write(arduino_fd, char_ptr, 1);
+                    cout <<bytes_written<<endl;
+                    perror("error");
+                }
+                temp_indicator = !temp_indicator;
+                
+            } else if(strcmp(url, "/standby") == 0) {
+                reply = "{\n\"msg\": \"Standby Mode\"\n}";
+                char standby = 'y';
+                char* char_ptr = &standby;
                 int bytes_written = write(arduino_fd, char_ptr, 1);
                 cout <<bytes_written<<endl;
                 perror("error");
-            } else {
-                reply = "{\n\"temp\": \""+ to_string(1.8 * num + 32) +"\",\n\"avg\": \"" + to_string(1.8 * avg + 32) + "\",\n\"low\": \"" + to_string(1.8 * low + 32) + "\",\n\"high\": \"" + to_string(1.8 * high + 32) + "\"\n}\n";
-                char f = 'f';
-                char *char_ptr = &f;
-                int bytes_written = write(arduino_fd, char_ptr, 1);
+            } else if(strcmp(url, "/pinWindow") == 0) {
+                if(!arduino_status){
+                    reply = "{\n\"msg\": \"no response\"\n}\n";
+                    cout << reply << endl;
+                    send(fd, reply.c_str(), reply.length(), 0);
+                    close(fd);
+                    continue;
+                }
+                reply = "{\n\"msg\": \"render pin window\"\n}";
+            } else if(url[1] >= '0' && url[1] <= '9') {
+                // 0412 
+                if(!arduino_status){
+                    reply = "{\n\"msg\": \"no response\"\n}\n";
+                    cout << reply << endl;
+                    send(fd, reply.c_str(), reply.length(), 0);
+                    close(fd);
+                    continue;
+                }
+                reply = "{\n\"msg\": \"temp received\",\n\"temp\": \"";
+                cout << "This is the incoming url" << url << endl;
+                int k;
+                for(k = 1; url[k] != '\0'; k++) {
+                    reply += url[k];
+                }
+                url[0] = 'w';
+                reply += "\"\n}";
+                int bytes_written = write(arduino_fd, url, k);
                 cout <<bytes_written<<endl;
                 perror("error");
             }
-            temp_indicator = !temp_indicator;
-            
-        } else if(strcmp(url, "/standby") == 0) {
-            reply = "{\n\"msg\": \"Standby Mode\"\n}";
-            char standby = 'y';
-            char* char_ptr = &standby;
-            int bytes_written = write(arduino_fd, char_ptr, 1);
-            cout <<bytes_written<<endl;
-            perror("error");
-        } else if(strcmp(url, "/pinWindow") == 0) {
-            reply = "{\n\"msg\": \"render pin window\"\n}";
-        } else if(url[1] >= '0' && url[1] <= '9') {
-            reply = "{\n\"msg\": \"temp received\",\n\"temp\": \"";
-            cout << "This is the incoming url" << url << endl;
-            int k;
-            for(k = 1; url[k] != '\0'; k++) {
-                reply += url[k];
-            }
-            url[0] = 'w';
-            reply += "\"\n}";
-            int bytes_written = write(arduino_fd, url, k);
-            cout <<bytes_written<<endl;
-            perror("error");
-        }
-        
-        
+    
         cout << reply << endl;
         send(fd, reply.c_str(), reply.length(), 0);
         close(fd);
@@ -208,24 +259,30 @@ void calculate_data(deque<double> temps) {
 }
 
 void configure(int fd) {
-    struct termios pts;
-    tcgetattr(fd, &pts);
-    cfsetospeed(&pts, 9600);
-    cfsetispeed(&pts, 9600);
-    
-    pts.c_cflag &= ~PARENB;
-    pts.c_cflag &= ~CSTOPB;
-    pts.c_cflag &= ~CSIZE;
-    pts.c_cflag |= CS8;
-    pts.c_cflag &= ~CRTSCTS;
-    pts.c_cflag |= CLOCAL | CREAD;
-    
-    pts.c_iflag |= IGNPAR | IGNCR;
-    pts.c_iflag &= ~(IXON | IXOFF | IXANY);
-    pts.c_lflag |= ICANON;
-    pts.c_oflag &= ~OPOST;
-    
-    tcsetattr(fd, TCSANOW, &pts);
+   struct termios pts;
+   tcgetattr(fd, &pts);
+   cfsetospeed(&pts, 9600);
+   cfsetispeed(&pts, 9600);
+   
+   pts.c_cflag &= ~PARENB;
+   pts.c_cflag &= ~CSTOPB;
+   pts.c_cflag &= ~CSIZE;
+   pts.c_cflag |= CS8;
+   pts.c_cflag &= ~CRTSCTS;
+   pts.c_cflag |= CLOCAL | CREAD;
+   
+   pts.c_iflag |= IGNPAR | IGNCR;
+   pts.c_iflag &= ~(IXON | IXOFF | IXANY);
+   pts.c_lflag |= ICANON;
+   pts.c_oflag &= ~OPOST;
+   
+   tcsetattr(fd, TCSANOW, &pts);
+   
+    // struct  termios pts;
+    // tcgetattr(fd, &pts);
+    // cfsetospeed(&pts, 9600);
+    // cfsetispeed(&pts, 9600);
+    // tcsetattr(fd, TCSANOW, &pts);
 }
 
 void* read_arduino(void* p) {
