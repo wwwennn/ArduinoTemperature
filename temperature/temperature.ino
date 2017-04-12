@@ -68,6 +68,7 @@ void setup()
 
 //add a global variable
 char temp = 'c';
+char temp_record;
 
 void loop() 
 { 
@@ -138,9 +139,38 @@ void loop()
     UpdateRGB (Temperature_H);
     
     /* Display temperature on the 7-Segment */
-    Dis_7SEG (Decimal, Temperature_H, Temperature_L, IsPositive, temp);
-
-//    temp = 'c';
+//    if(temp != 'y' && temp != 'w') {
+    if(temp == 'c' || temp == 'f') {
+      temp_record = temp;
+      Dis_7SEG (Decimal, Temperature_H, Temperature_L, IsPositive, temp_record);
+    } 
+    if(temp == 'w') {
+      if(Serial.available() > 0) {
+        temp = Serial.read();
+        Send7SEG (4,NumberLookup[temp - '0']); 
+      }
+      if(Serial.available() > 0) {
+        temp = Serial.read();
+        byte Number = NumberLookup[temp - '0'];
+        Number = Number | B10000000;
+        Send7SEG (3,Number);  
+      }
+      if(Serial.available() > 0) {
+        temp = Serial.read();
+      }
+      if(Serial.available() > 0) {
+        temp = Serial.read();
+        Send7SEG (2,NumberLookup[temp - '0']); 
+      }
+      if(temp_record == 'c') {
+        Send7SEG (1,0x58);  
+      } else {
+        Send7SEG (1,0x71);
+      }
+      while(Serial.available() > 0) {
+        Serial.read();  
+      }
+    }
     
     delay (1000);        /* Take temperature read every 1 second */
   }
@@ -229,8 +259,11 @@ void Dis_7SEG (int Decimal, byte High, byte Low, bool sign, char temp)
 
   if (Digit > 0)                 /* Display "c" if there is more space on 7-SEG */
   {
-    // Send7SEG (Digit,0x58);
-    Send7SEG (Digit,0x71);
+    if(temp == 'c') {
+      Send7SEG (Digit,0x58);
+    } else {
+      Send7SEG (Digit,0x71);
+    }
     Digit--;
   }
   
