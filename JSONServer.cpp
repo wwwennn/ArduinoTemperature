@@ -188,6 +188,9 @@ void* start_server(void* p) {
             int bytes_written = write(arduino_fd, char_ptr, 1);
             cout <<bytes_written<<endl;
             perror("error");
+            if(bytes_written == -1){
+                reply = "{\n\"temp\": \"arduino is not working\"\n}\n";
+            }
             
         } else if(strcmp(url, "/standby") == 0) {
             reply = "{\n\"msg\": \"Standby Mode\"\n}";
@@ -204,7 +207,7 @@ void* start_server(void* p) {
             
         } else if(sscanf(url, "/pin2/%s", threshold) > 0){
             if(!arduino_status){
-                reply = "{\n\"msg\": \"arduino is not working\"\n}\n";
+                reply = "{\n\"msg\": \"can not set threshold\"\n}\n";
                 cout << reply << endl;
                 send(fd, reply.c_str(), reply.length(), 0);
                 close(fd);
@@ -217,7 +220,7 @@ void* start_server(void* p) {
         } else if(sscanf(url, "/%s", user_input_temp) > 0) {
             // 0412
             if(!arduino_status){
-                reply = "{\n\"msg\": \"arduino is not working\"\n}\n";
+                reply = "{\n\"msg\": \"can not set temperature\"\n}\n";
                 cout << reply << endl;
                 send(fd, reply.c_str(), reply.length(), 0);
                 close(fd);
@@ -237,7 +240,7 @@ void* start_server(void* p) {
             int bytes_written = write(arduino_fd, url, k);
             // cout <<bytes_written<<endl;
             if(bytes_written == -1){
-                reply = "{\n\"msg\": \"arduino is not working\"\n}\n";
+                reply = "{\n\"msg\": \"can not set temperature\"\n}\n";
             }
             // perror("error");
             
