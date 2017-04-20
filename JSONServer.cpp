@@ -17,23 +17,30 @@
 using namespace std;
 
 // global variables
+int arduino_fd;
+int PORT_NUMBER;
 double num = 0;
 deque<double> temp_queue;
 double avg = 0;
 double low = 0;
 double high = 0;
-bool temp_indicator = false;  // false: c; true: f
-// if true arduino is working, if false, arduino is not working
-bool arduino_status = true; // false: arduino is not working true: arduino is working
-//bool arduino_status = false; // temporarily set to false for testing purpose
-
+bool arduino_status = false; // false: arduino is not working true: arduino is working
 char threshold[20];
 char user_input_temp[20];
+// 0419 stop server
+const char* file_name;
+pthread_mutex_t lock1;
+bool server_status = true; // false: server is not working, true: working
 
-int start_server(int, int);
+void* start_server(void* p);
 void* read_arduino(void*);
 void configure(int);
 void calculate_data(deque<double>);
+void handler(int);
+void* stop_arduino(void*);
+void* stop_server(void*);
+int is_server_open();
+
 
 int main(int argc, const char * argv[]) {
     // check the number of arguments. port: argv[1], device: argv[2]
@@ -42,38 +49,41 @@ int main(int argc, const char * argv[]) {
         exit(0);
     }
     
-    // get port number
-    int PORT_NUMBER = atoi(argv[1]);
+    // 0419 stop server
+    PORT_NUMBER = atoi(argv[1]);
+    file_name = argv[2];
+    pthread_t arduino_thread, server_thread;
+    pthread_create(&server_thread, NULL, start_server, &arduino_thread);
     
-    // arduino configuration
-    int arduino_fd = open(argv[2], O_RDWR | O_NOCTTY | O_NDELAY);
-    //    while(arduino_fd < 0) {
-    //        perror("Could not open file");
-    //        arduino_fd = open(argv[2], O_RDWR | O_NOCTTY | O_NDELAY);
-    //    }
-    //    cout << "Successfully opened " << argv[2] << " for reading/writing" << endl;
-    
-    if(arduino_fd < 0) {
-        perror("Could not open file");
-        exit(1);
-    } else {
+    while(is_server_open()){
+        arduino_fd = open(argv[2], O_CREAT | O_RDWR | O_NOCTTY | O_NDELAY);
+        cout << "Try to open the " << argv[2] << "..." << endl;
+        while(arduino_fd < 0 && is_server_open()) {
+            // perror("Could not open file");
+            arduino_fd = open(argv[2], O_CREAT | O_RDWR | O_NOCTTY | O_NDELAY);
+        }
         cout << "Successfully opened " << argv[2] << " for reading/writing" << endl;
+        // update the arduino status
+        arduino_status = true;
+        // fcntl(arduino_fd, F_SETFL, FNDELAY);
+        
+        // start related functions
+        pthread_create(&arduino_thread, NULL, read_arduino, &arduino_thread);
+        cout << "read_arduino is Successfully created!" << endl;
+        
+        // end of the program
+        void* r;
+        pthread_join(arduino_thread, &r);
+        cout << "arduino_fd is closed now" << endl;
+        // close(arduino_fd);
     }
-    fcntl(arduino_fd, F_SETFL, FNDELAY);
     
-    // start related functions
-    pthread_t arduino_thread;
-    pthread_create(&arduino_thread, NULL, read_arduino, &arduino_fd);
-    start_server(PORT_NUMBER, arduino_fd);
-    
-    // end of the program
-    void* r;
-    pthread_join(arduino_thread, &r);
-    
+    void* r1;
+    pthread_join(server_thread, &r1);
     return 0;
 }
 
-int start_server(int PORT_NUMBER, int arduino_fd) {
+void* start_server(void* p) {
     // structs to represent the server and client
     struct sockaddr_in server_addr,client_addr;
     
@@ -112,7 +122,19 @@ int start_server(int PORT_NUMBER, int arduino_fd) {
     cout << endl << "Server configured to listen on port " << PORT_NUMBER << endl;
     fflush(stdout);
     
-    while(true) {
+    // 0419 stop server
+    pthread_mutex_init(&lock1, NULL);
+    pthread_t stop_server_thread;
+    int r1;
+    void* r;
+    r1 = pthread_create(&stop_server_thread, NULL, &stop_server, NULL);
+    if(r1 == 0){
+        cout << "stop_server_thread is successfully created !!! " << endl;
+    }else{
+        cout << "stop_server_thread is not created !!! " << endl;
+    }
+    
+    while(is_server_open()) {
         // 4. accept: wait here until we get a connection on that port
         int sin_size = sizeof(struct sockaddr_in);
         int fd = accept(sock, (struct sockaddr *)&client_addr,(socklen_t *)&sin_size);
@@ -137,7 +159,8 @@ int start_server(int PORT_NUMBER, int arduino_fd) {
         if(strcmp(url, "/c") == 0 || strcmp(url, "/f") == 0 || strcmp(url, "/convert/c") == 0 || strcmp(url, "/convert/f") == 0) {
             // 0412
             if(!arduino_status){
-                reply = "{\n\"temp\": \"no response\"\n}\n";
+                // 0419
+                reply = "{\n\"temp\": \"arduino is not working\"\n}\n";
                 cout << reply << endl;
                 send(fd, reply.c_str(), reply.length(), 0);
                 close(fd);
@@ -165,46 +188,6 @@ int start_server(int PORT_NUMBER, int arduino_fd) {
             int bytes_written = write(arduino_fd, char_ptr, 1);
             cout <<bytes_written<<endl;
             perror("error");
-            // if(temp_indicator) {
-            
-            // } else {
-            //     reply = "{\n\"temp\": \""+ to_string(1.8 * num + 32) +"\",\n\"avg\": \"" + to_string(1.8 * avg + 32) + "\",\n\"low\": \"" + to_string(1.8 * low + 32) + "\",\n\"high\": \"" + to_string(1.8 * high + 32) + "\"\n}\n";
-            //     char f = 'f';
-            //     char *char_ptr = &f;
-            //     int bytes_written = write(arduino_fd, char_ptr, 1);
-            //     cout <<bytes_written<<endl;
-            //     perror("error");
-            // }
-            
-            // } else if(strcmp(url, "/convert") == 0) {
-            //     // 0412
-            //     if(!arduino_status){
-            //         reply = "{\n\"temp\": \"no response\"\n}\n";
-            //         cout << reply << endl;
-            //         send(fd, reply.c_str(), reply.length(), 0);
-            //         close(fd);
-            //         continue;
-            //     }
-            //     calculate_data(temp_queue);
-            //     cout << "Avg: " << avg << " low: " << low << " high: " << high << endl;
-            //     reply = "{\n\"temp\": \""+ to_string(num) +"\",\n\"avg\": \"" + to_string(avg) + "\",\n\"low\": \"" + to_string(low) + "\",\n\"high\": \"" + to_string(high) + "\"\n}\n";
-            //         char f = 'c';
-            //         char *char_ptr = &f;
-            //         int bytes_written = write(arduino_fd, char_ptr, 1);
-            //         cout <<bytes_written<<endl;
-            //         perror("error");
-            
-            // if(!temp_indicator) {
-            
-            // } else {
-            //     reply = "{\n\"temp\": \""+ to_string(1.8 * num + 32) +"\",\n\"avg\": \"" + to_string(1.8 * avg + 32) + "\",\n\"low\": \"" + to_string(1.8 * low + 32) + "\",\n\"high\": \"" + to_string(1.8 * high + 32) + "\"\n}\n";
-            //     char f = 'f';
-            //     char *char_ptr = &f;
-            //     int bytes_written = write(arduino_fd, char_ptr, 1);
-            //     cout <<bytes_written<<endl;
-            //     perror("error");
-            // }
-            // temp_indicator = !temp_indicator;
             
         } else if(strcmp(url, "/standby") == 0) {
             reply = "{\n\"msg\": \"Standby Mode\"\n}";
@@ -214,24 +197,19 @@ int start_server(int PORT_NUMBER, int arduino_fd) {
             cout <<bytes_written<<endl;
             perror("error");
         } else if(strcmp(url, "/pinWindow1") == 0) {
-            if(!arduino_status){
-                reply = "{\n\"msg\": \"no response\"\n}\n";
-                cout << reply << endl;
-                send(fd, reply.c_str(), reply.length(), 0);
-                close(fd);
-                continue;
-            }
             reply = "{\n\"msg\": \"pin_window1\"\n}";
+            
         } else if(strcmp(url, "/pinWindow2") == 0){
+            reply = "{\n\"msg\": \"pin_window2\"\n}";
+            
+        } else if(sscanf(url, "/pin2/%s", threshold) > 0){
             if(!arduino_status){
-                reply = "{\n\"msg\": \"no response\"\n}\n";
+                reply = "{\n\"msg\": \"arduino is not working\"\n}\n";
                 cout << reply << endl;
                 send(fd, reply.c_str(), reply.length(), 0);
                 close(fd);
                 continue;
             }
-            reply = "{\n\"msg\": \"pin_window2\"\n}";
-        } else if(sscanf(url, "/pin2/%s", threshold) > 0){
             cout << "threshold: " << threshold << endl;
             reply = "{\n\"msg\": \"threshold received\",\n\"temp\": \"" + to_string(num) +"\",\n\"threshold\": \"" + threshold;
             reply += "\"\n}";
@@ -239,7 +217,7 @@ int start_server(int PORT_NUMBER, int arduino_fd) {
         } else if(sscanf(url, "/%s", user_input_temp) > 0) {
             // 0412
             if(!arduino_status){
-                reply = "{\n\"msg\": \"no response\"\n}\n";
+                reply = "{\n\"msg\": \"arduino is not working\"\n}\n";
                 cout << reply << endl;
                 send(fd, reply.c_str(), reply.length(), 0);
                 close(fd);
@@ -257,8 +235,11 @@ int start_server(int PORT_NUMBER, int arduino_fd) {
             // }
             url[0] = 'w';
             int bytes_written = write(arduino_fd, url, k);
-            cout <<bytes_written<<endl;
-            perror("error");
+            // cout <<bytes_written<<endl;
+            if(bytes_written == -1){
+                reply = "{\n\"msg\": \"arduino is not working\"\n}\n";
+            }
+            // perror("error");
             
         } else{
             reply = "{\n\"msg\": \"not valid url\"\n}\n";
@@ -272,11 +253,16 @@ int start_server(int PORT_NUMBER, int arduino_fd) {
         send(fd, reply.c_str(), reply.length(), 0);
         close(fd);
     }
-    
+    // 0419 stop server
+    pthread_join(stop_server_thread, &r);
     close(sock);
     cout << "Server closed connection" << endl;
     
-    return 0;
+    void* r2;
+    // kill arduino_thread since stopped server
+    signal(SIGUSR1, handler);
+    pthread_kill( *(pthread_t*)p, SIGUSR1);
+    pthread_exit(NULL);
 }
 
 void calculate_data(deque<double> temps) {
@@ -328,49 +314,90 @@ void configure(int fd) {
     // tcsetattr(fd, TCSANOW, &pts);
 }
 
+/*
+ * This function gets called when a particular signal is sent to a thread.
+ * As you can see, it just ends the function.
+ */
+void handler(int signum) {
+    pthread_exit(NULL);
+}
+
+// 0419 stop arduino
+void* stop_arduino(void* p){
+    sleep(3);
+    signal(SIGUSR2, handler);
+    // to kill the arduino thread
+    pthread_kill( *(pthread_t*)p, SIGUSR2 );
+    // update the arduino status
+    arduino_status = false;
+    return NULL;
+}
+
 void* read_arduino(void* p) {
-    int* arduino_fd = (int*)p;
-    configure(*arduino_fd);
+    int counter = 0;
+    configure(arduino_fd);
     char buf[100];
-    int start = 0;
-    int bytes_read = read(*arduino_fd, buf, 100);
-    int end = bytes_read;
     string message;
+    int j = 0;
+    int bytes_read;
+    pthread_t stop_arduino_thread;
     
-    while(true) {
-        int j = start;
+    while(true){
+        message.clear();
+        j = 0;
+        pthread_create(&stop_arduino_thread, NULL, stop_arduino, p);
+        bytes_read = read(arduino_fd, buf, 100);
+        while(bytes_read == -1){
+            bytes_read = read(arduino_fd, buf, 100);
+        }
         
-        while(j < end) {
-            if(buf[j] == '\n') {
-                break;
-            }
+        // kill the stop_arduino thread
+        signal(SIGUSR1, handler);
+        pthread_kill(stop_arduino_thread, SIGUSR1);
+        
+        while(buf[j] != '\n' && j < bytes_read){
             message += buf[j];
             j++;
         }
         
-        if(j < end) {
-            if(message.length() != 0) {
-                if(sscanf(message.c_str(), "The temperature is %lf degree C\n", &num) > 0){
-                    cout << num << endl;
-                    temp_queue.push_back(num);
-                }
-                
-                // only keep 3600 records (1 record per second, 3600 records per hour)
-                if(temp_queue.size() > 3600){
-                    temp_queue.pop_front();
-                }
+        if(message.length() != 0) {
+            if(sscanf(message.c_str(), "The temperature is %lf degree C\n", &num) > 0){
+                cout << num << endl;
+                temp_queue.push_back(num);
+            }else{
+                continue;
             }
-            message.clear();
-            start = ++j;
-        } else {
-            bytes_read = read(*arduino_fd, buf, 100);
-            //            while(bytes_read <= 0) {
-            //                bytes_read = read(*arduino_fd, buf, 100);
-            //            }
-            start = 0;
-            end = bytes_read;
+            
+            // only keep 3600 records (1 record per second, 3600 records per hour)
+            if(temp_queue.size() > 3600){
+                temp_queue.pop_front();
+            }
+        }else{
+            continue;
         }
     }
+    return 0;
+}
+
+// 0419 stop server
+void* stop_server(void* p){
+    string input;
+    cout << "press q & Enter to quit:" << endl;
+    while(input != "q"){
+        cin >> input;
+    }
     
+    pthread_mutex_lock(&lock1);
+    server_status = false;
+    pthread_mutex_unlock(&lock1);
     return NULL;
+}
+
+// 0419 stop server
+int is_server_open(){
+    int result = 1;
+    pthread_mutex_lock(&lock1);
+    result = server_status;
+    pthread_mutex_unlock(&lock1);
+    return result;
 }
