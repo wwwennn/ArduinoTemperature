@@ -27,6 +27,7 @@ double high = 0;
 bool arduino_status = false; // false: arduino is not working true: arduino is working
 char threshold[20];
 char user_input_temp[20];
+char user_input_temp_value[20];
 // 0419 stop server
 const char* file_name;
 pthread_mutex_t lock1;
@@ -193,12 +194,25 @@ void* start_server(void* p) {
             }
             
         } else if(strcmp(url, "/standby") == 0) {
-            reply = "{\n\"msg\": \"Standby Mode\"\n}";
+            // has to communicate with arduino for setting the standby mode
+            if(!arduino_status){
+                reply = "{\n\"msg\": \"can not set standby mode\"\n}\n";
+                cout << reply << endl;
+                send(fd, reply.c_str(), reply.length(), 0);
+                close(fd);
+                continue;
+            }
+            // Problem 1: the arduino still displays temp after the standby mode is set
             char standby = 'y';
             char* char_ptr = &standby;
             int bytes_written = write(arduino_fd, char_ptr, 1);
             cout <<bytes_written<<endl;
             perror("error");
+            if(bytes_written == -1){
+                reply = "{\n\"msg\": \"can not set standby mode\"\n}\n";
+            }else{
+                reply = "{\n\"msg\": \"Standby Mode\"\n}";
+            }
         } else if(strcmp(url, "/pinWindow1") == 0) {
             reply = "{\n\"msg\": \"pin_window1\"\n}";
             
@@ -217,8 +231,8 @@ void* start_server(void* p) {
             reply = "{\n\"msg\": \"threshold received\",\n\"temp\": \"" + to_string(num) +"\",\n\"threshold\": \"" + threshold;
             reply += "\"\n}";
             
-        } else if(sscanf(url, "/%s", user_input_temp) > 0) {
-            // 0412
+        } else if(sscanf(url, "/c%s", user_input_temp) > 0 || sscanf(url, "/f%s", user_input_temp) > 0) {
+            // 0412 /c/20 /c/90
             if(!arduino_status){
                 reply = "{\n\"msg\": \"can not set temperature\"\n}\n";
                 cout << reply << endl;
@@ -226,30 +240,44 @@ void* start_server(void* p) {
                 close(fd);
                 continue;
             }
+            sscanf(user_input_temp, "/%s", user_input_temp_value);
             reply = "{\n\"msg\": \"temp received\",\n\"temp\": \"";
-            reply += user_input_temp;
+            reply += user_input_temp_value;
             reply += "\"\n}";
             int k = 0;
             while(url[k] != '\0'){
                 k++;
             }
-            // for(k = 6; url[k] != '\0'; k++) {
-            //     reply += url[k];
-            // }
-            url[0] = 'w';
-            int bytes_written = write(arduino_fd, url, k);
-            // cout <<bytes_written<<endl;
+            // since the arduino restarts with temp = c
+            // if the diconnection and reconnection of arduino occurs when the user input temperature,
+            // it will still write correct c or F to arduino by resetting arduino temp = c or f
+            char f = url[1];
+            cout << "f: " << f << endl;
+            char *char_ptr = &f;
+            int bytes_written = write(arduino_fd, char_ptr, 1);
+            cout <<bytes_written<<endl;
+            perror("error");
             if(bytes_written == -1){
-                reply = "{\n\"msg\": \"can not set temperature\"\n}\n";
+                reply = "{\n\"temp\": \"can not set temperature\"\n}\n";
+            }else{
+                user_input_temp[0] = 'w';
+                bytes_written = write(arduino_fd, user_input_temp, k);
+                // cout <<bytes_written<<endl;
+                if(bytes_written == -1){
+                    reply = "{\n\"msg\": \"can not set temperature\"\n}\n";
+                }
+                // perror("error");
             }
-            // perror("error");
             
-        } else{
-            reply = "{\n\"msg\": \"not valid url\"\n}\n";
-            cout << reply << endl;
-            send(fd, reply.c_str(), reply.length(), 0);
-            close(fd);
-            continue;
+        } else {
+            // if the incoming is to resume to normal mode or if it's an invalid url
+            if(!arduino_status){
+                reply = "{\n\"msg\": \"can not set normal mode\"\n}\n";
+                
+            }else{
+                reply = "{\n\"msg\": \"resume\"\n}\n";
+                // Problem 2: how to inform the arduino that it should be back to normal mode?
+            }
         }
         
         cout << reply << endl;
